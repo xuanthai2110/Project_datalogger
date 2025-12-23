@@ -1,0 +1,21 @@
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+DATA_DIR = BASE_DIR / "data"
+PROFILES_DIR = BASE_DIR / "profiles"
+FAULT_PROFILE_DIR = PROFILES_DIR / "fault"
+
+SERVER_URL = "https://7cvpjfms-8000.asse.devtunnels.ms/"
+#FAULT_PROFILE_FILE = str(FAULT_PROFILE_DIR / "fault_sungrow.yaml")
+
+MODBUS_PORT = "/dev/ttyUSB0"
+MODBUS_BAUDRATE = 9600
+MODBUS_PARITY = "N"
+MODBUS_STOPBITS = 1
+MODBUS_TIMEOUT = 1.0
+MODBUS_RETRIES = 3
+
+READ_INTERVAL_SECONDS = 100
+CONNECT_SERVER = False
+SERVER_PUSH_INTERVAL_SECONDS = 300
+print(BASE_DIR)

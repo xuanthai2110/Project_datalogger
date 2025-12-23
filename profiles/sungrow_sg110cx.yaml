@@ -1,0 +1,210 @@
+# =====================================================================
+#  Sungrow SG110CX — Modbus Profile (Fully Standardized)
+#  Based on official Sungrow protocol document V1.1.53
+# =====================================================================
+
+vendor: sungrow
+model: SG110CX
+protocol: modbus
+device_type_code: 0x2C06
+rated_power_kw: 110.0
+mppt_count: 9
+strings_per_mppt: 2
+
+# ---------------------------------------------------------------------
+# Sungrow Endian Specification
+# ---------------------------------------------------------------------
+# - U16/S16: Big-endian byte order (Modbus standard)
+# - U32/S32: Little-endian WORD order, big-endian byte order
+#            Low-word first, high-word second
+# - UTF-8:   High byte first per register
+# ---------------------------------------------------------------------
+endian:
+  word: little
+  byte: big
+
+# ---------------------------------------------------------------------
+# Supported Features
+# ---------------------------------------------------------------------
+features:
+  - StartStop
+  - PQLimit
+  - PID
+  - Heartbeat
+
+# =====================================================================
+#                          REGISTER MAP
+# =====================================================================
+mapping:
+
+  #####################################################################
+  # DEVICE INFORMATION (4990–5002)
+  #####################################################################
+  infor:
+    sn:           {addr: 4990, len: 10, type: string, reg_type: ir}    # 20 bytes UTF-8
+    type_code:    {addr: 5000, type: u16, reg_type: ir}
+    rated_power:  {addr: 5001, type: u16, scale: 0.1, reg_type: ir}    # kW
+    output_type:  {addr: 5002, type: u16, reg_type: ir}
+
+  #####################################################################
+  # TELEMETRY (5003–5151)
+  #####################################################################
+  telemetry:
+
+    # Energy counters
+    e_day_kwh:     {addr: 5003, type: u16, scale: 0.1, reg_type: ir}
+    e_total_kwh:   {addr: 5004, type: u32, reg_type: ir}
+    t_total_h:     {addr: 5006, type: u32, reg_type: ir}
+    s_total_va:    {addr: 5009, type: u32, reg_type: ir}
+
+    # Temperature
+    temperature:    {addr: 5008, type: s16, scale: 0.1, reg_type: ir}
+
+    # AC Voltages (Phase-to-phase)
+    v_ab:          {addr: 5019, type: u16, scale: 0.1, reg_type: ir}
+    v_bc:          {addr: 5020, type: u16, scale: 0.1, reg_type: ir}
+    v_ca:          {addr: 5021, type: u16, scale: 0.1, reg_type: ir}
+
+    # AC Currents
+    i_a:           {addr: 5022, type: u16, scale: 0.1, reg_type: ir}
+    i_b:           {addr: 5023, type: u16, scale: 0.1, reg_type: ir}
+    i_c:           {addr: 5024, type: u16, scale: 0.1, reg_type: ir}
+
+    # Output power (Active, Reactive)
+    p_total_w:     {addr: 5031, type: u32, reg_type: ir}
+    q_total_var:   {addr: 5033, type: s32, reg_type: ir}
+
+    # Power factor
+    pf:            {addr: 5035, type: s16, scale: 0.001, reg_type: ir}
+
+    # Grid frequency (50.00Hz = 5000)
+    F:             {addr: 5036, type: u16, scale: 0.1, reg_type: ir}
+    IR:            {addr: 5071, type: u16, scale: 1, reg_type: ir}
+    # Status & faults
+    work_state:    {addr: 5038, type: u16, reg_type: ir}
+
+    # Timestamp
+    timestamp_y:   {addr: 5039, type: u16, reg_type: ir}
+    timestamp_m:   {addr: 5040, type: u16, reg_type: ir}
+    timestamp_d:   {addr: 5041, type: u16, reg_type: ir}
+    timestamp_h:   {addr: 5042, type: u16, reg_type: ir}
+    timestamp_min: {addr: 5043, type: u16, reg_type: ir}
+    timestamp_s:   {addr: 5044, type: u16, reg_type: ir}
+    fault_code:    {addr: 5045, type: u16, reg_type: ir}
+
+    # Work state 2 (bitmask)
+    work_state2:   {addr: 5081, type: u32, reg_type: ir}
+
+    # Grid Hz
+    grid_hz:       {addr: 5148, type: u16, scale: 0.01, reg_type: ir}
+
+    # PID
+    pid_state:     {addr: 5150, type: u16, reg_type: ir}
+    pid_alarm:     {addr: 5151, type: u16, reg_type: ir}
+
+  #####################################################################
+  # MPPT BLOCK (5011–5131)
+  #####################################################################
+  mppt:
+
+    # MPPT 1–3 (5011–5016)
+    - {v: {addr: 5011, type: u16, scale: 0.1, reg_type: ir},
+       i: {addr: 5012, type: u16, scale: 0.1, reg_type: ir}}
+
+    - {v: {addr: 5013, type: u16, scale: 0.1, reg_type: ir},
+       i: {addr: 5014, type: u16, scale: 0.1, reg_type: ir}}
+
+    - {v: {addr: 5015, type: u16, scale: 0.1, reg_type: ir},
+       i: {addr: 5016, type: u16, scale: 0.1, reg_type: ir}}
+
+    # MPPT 4–8 (5115–5124)
+    - {v: {addr: 5115, type: u16, scale: 0.1, reg_type: ir},
+       i: {addr: 5116, type: u16, scale: 0.1, reg_type: ir}}
+
+    - {v: {addr: 5117, type: u16, scale: 0.1, reg_type: ir},
+       i: {addr: 5118, type: u16, scale: 0.1, reg_type: ir}}
+
+    - {v: {addr: 5119, type: u16, scale: 0.1, reg_type: ir},
+       i: {addr: 5120, type: u16, scale: 0.1, reg_type: ir}}
+
+    - {v: {addr: 5121, type: u16, scale: 0.1, reg_type: ir},
+       i: {addr: 5122, type: u16, scale: 0.1, reg_type: ir}}
+
+    - {v: {addr: 5123, type: u16, scale: 0.1, reg_type: ir},
+       i: {addr: 5124, type: u16, scale: 0.1, reg_type: ir}}
+
+    # MPPT 9 (5130–5131)
+    - {v: {addr: 5130, type: u16, scale: 0.1, reg_type: ir},
+       i: {addr: 5131, type: u16, scale: 0.1, reg_type: ir}}
+
+  #####################################################################
+  # STRING CURRENTS (7013–7030)
+  #####################################################################
+  strings:
+    base_addr: 7013
+    count: 18
+    type: u16
+    scale: 0.01
+    reg_type: ir
+
+# =====================================================================
+#                         CONTROL COMMANDS (HR)
+# =====================================================================
+controls:
+
+  # Start / Stop
+  start_stop:
+    addr: 5006
+    type: u16
+    reg_type: hr
+    enum: {start: 0xCF, stop: 0xCE}
+
+  # Power limit
+  p_limit_enable:
+    addr: 5007
+    type: u16
+    reg_type: hr
+    enum: {on: 0xAA, off: 0x55}
+
+  p_limit_pct:
+    addr: 5008
+    type: u16
+    scale: 0.1
+    reg_type: hr
+
+  # Power factor
+  pf_set:
+    addr: 5019
+    type: s16
+    scale: 0.001
+    reg_type: hr
+
+  # Reactive mode
+  q_mode:
+    addr: 5036
+    type: u16
+    reg_type: hr
+    enum: {PF: 0xA1, Qpercent: 0xA2, QPcurve: 0xA3, QUcurve: 0xA4}
+
+  # Reactive power setpoints
+  q_pct_set:   {addr: 5037, type: s16, scale: 0.1, reg_type: hr}
+  q_set_kvar:  {addr: 5040, type: s16, scale: 0.1, reg_type: hr}
+
+  # Active overload
+  active_overload:
+    addr: 5020
+    type: u16
+    reg_type: hr
+    enum: {on: 0xAA, off: 0x55}
+
+  # PID controls
+  pid_recover:   {addr: 5041, type: u16, reg_type: hr, enum: {on: 0xAA, off: 0x55}}
+  pid_anti:      {addr: 5042, type: u16, reg_type: hr, enum: {on: 0xAA, off: 0x55}}
+  pid_full_day:  {addr: 5043, type: u16, reg_type: hr, enum: {on: 0xAA, off: 0x55}}
+
+  # SVG
+  night_svg:
+    addr: 5035
+    type: u16
+    reg_type: hr
+    enum: {on: 0xAA, off: 0x55}
