@@ -72,6 +72,17 @@ class ProfileLoader:
             if k not in inv:
                 raise ValueError(f"Inverter missing key: {k}")
 
+        # Nếu active thì bắt buộc có comm
+        if inv.get("inverter_state") == "active":
+            if "comm" not in inv or not isinstance(inv["comm"], dict):
+                raise ValueError(f"Inverter {inv.get('inverter_id')} missing comm")
+
+            comm_required = ["mode", "port", "baudrate", "parity", "stopbits", "timeout", "slave_id"]
+            for ck in comm_required:
+                if ck not in inv["comm"]:
+                    raise ValueError(f"Inverter {inv.get('inverter_id')} comm missing key: {ck}")
+
+
     # =========================
     # QUERY HELPERS
     # =========================

@@ -12,8 +12,16 @@ project:
   created_at: '2025-11-20T07:20:10.342Z'
   inverters:
   - serial_number: A2011124499
+    comm:
+      mode: rtu
+      port: /dev/ttyUSB0
+      baudrate: 9600
+      parity: N
+      stopbits: 1
+      timeout: 1.0
+      slave_id: 1
     brand: sungrow
-    model: SG50CX
+    model: SG110CX
     firmware_version: '1.0'
     phase_count: 3
     mppt_count: 5
@@ -27,8 +35,16 @@ project:
     replace_by_id: Null
     inverter_state: active
   - serial_number: A2007294549
+    comm:
+      mode: rtu
+      port: /dev/ttyUSB0
+      baudrate: 9600
+      parity: N
+      stopbits: 1
+      timeout: 1.0
+      slave_id: 2
     brand: sungrow
-    model: SG50CX
+    model: SG110CX
     firmware_version: '1.0'
     phase_count: 3
     mppt_count: 5
@@ -42,8 +58,16 @@ project:
     replace_by_id: Null
     inverter_state: active
   - serial_number: A2011123534
+    comm:
+      mode: rtu
+      port: /dev/ttyUSB0
+      baudrate: 9600
+      parity: N
+      stopbits: 1
+      timeout: 1.0
+      slave_id: 3
     brand: sungrow
-    model: SG50CX
+    model: SG110CX
     firmware_version: '1.0'
     phase_count: 3
     mppt_count: 5
@@ -57,6 +81,14 @@ project:
     replace_by_id: Null
     inverter_state: active
   - serial_number: A20B2602480
+    comm:
+      mode: rtu
+      port: /dev/ttyUSB0
+      baudrate: 9600
+      parity: N
+      stopbits: 1
+      timeout: 1.0
+      slave_id: 4
     brand: sungrow
     model: SG50CX
     firmware_version: '1.0'

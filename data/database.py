@@ -1,148 +1,183 @@
-from typing import Dict, Any, List
-from data.database import DataBase
+import sqlite3
+import logging
 from datetime import datetime
 from typing import Optional, Dict, Tuple, Any, List
 from zoneinfo import ZoneInfo
-import logging
-class InverterData:
-    """
-    Container chuẩn cho 1 inverter sau khi đọc dữ liệu.
-    TelemetryBuilder / EnergyTracker chỉ làm việc với class này,
-    KHÔNG làm việc trực tiếp với driver.
-    """
 
-    # -----------------------------
-    def __init__(
+logger = logging.getLogger(__name__)
+DB_TIME_FMT = "%Y-%m-%d %H:%M:%S"
+
+
+class DataBase:
+    def __init__(self, db_path: str = "energy.db"):
+        self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self):
+        with sqlite3.connect(self.db_path) as conn:
+            c = conn.cursor()
+
+            # --- energy delta log ---
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS energy_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    inverter_id TEXT NOT NULL,
+                    ts DATETIME NOT NULL,
+                    e_total REAL NOT NULL,
+                    e_delta REAL NOT NULL,
+                    source TEXT
+                )
+            """)
+            c.execute("""
+                CREATE INDEX IF NOT EXISTS idx_energy_ts
+                ON energy_log (inverter_id, ts)
+            """)
+
+            # --- daily max table ---
+            # Mỗi dòng đại diện cho (inverter_id, day, mppt_index, string_index)
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS daily_max (
+                    inverter_id TEXT NOT NULL,
+                    day TEXT NOT NULL,                 -- YYYY-MM-DD (theo timezone VN)
+                    mppt_index INTEGER NOT NULL,       -- 1..9
+                    string_index INTEGER NOT NULL,     -- 1..18 (global)
+                    max_v_mppt REAL NOT NULL DEFAULT 0,
+                    max_i_mppt REAL NOT NULL DEFAULT 0,
+                    max_p_mppt REAL NOT NULL DEFAULT 0,
+                    max_i_string REAL NOT NULL DEFAULT 0,
+                    updated_at DATETIME NOT NULL,
+                    PRIMARY KEY (inverter_id, day, mppt_index, string_index)
+                )
+            """)
+            c.execute("""
+                CREATE INDEX IF NOT EXISTS idx_daily_max_day
+                ON daily_max (inverter_id, day)
+            """)
+
+            conn.commit()
+
+    # --------------------------
+    # ENERGY LOG APIs
+    # --------------------------
+    def insert_delta(
         self,
-        inverter_id: int,
-        serial: str,
-        tele: Dict[str, Any],
-        mppt: List[Dict[str, Any]],
-        strings: List[float],
-        severity: str = "STABLE",
-        fault_code: int = 0,
-        fault_description: str = "",
+        inverter_id: str,
+        ts: datetime,
+        e_total: float,
+        e_delta: float,
+        source: str = ""
     ):
-        self.inverter_id = inverter_id
-        self.serial = serial
-        self.tele = tele
-        self.mppt = mppt
-        self.strings = strings
-        self.severity = severity
-        self.fault_code = fault_code
-        self.fault_description = fault_description
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT INTO energy_log
+                (inverter_id, ts, e_total, e_delta, source)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                inverter_id,
+                ts.strftime(DB_TIME_FMT),
+                float(e_total),
+                float(e_delta),
+                source
+            ))
+            conn.commit()
 
-    # ======================================================
-    # FACTORY METHODS
-    # ======================================================
-    @classmethod
-    def from_snapshot(
-        cls,
-        inverter_id: int,
-        serial: str,
-        snapshot: Dict[str, Any],
-    ) -> "InverterData":
-        """
-        Tạo InverterData từ snapshot driver.read_all()
-        """
+    def get_last_record(self, inverter_id: str) -> Optional[Dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("""
+                SELECT ts, e_total
+                FROM energy_log
+                WHERE inverter_id = ?
+                ORDER BY ts DESC
+                LIMIT 1
+            """, (inverter_id,)).fetchone()
 
-        # snapshot = {"inverters": [ {...} ]}
-        inv = snapshot["inverters"][0]
+        if not row:
+            return None
 
-        ac = inv.get("ac", {})
-        mppts = inv.get("mppts", [])
-
-        # gom strings từ mppts
-        strings: List[float] = []
-        for mp in mppts:
-            for s in mp.get("strings", []):
-                strings.append(s.get("I_mppt", 0.0))
-
-        errors = inv.get("errors", [{}])
-        err = errors[0] if errors else {}
-
-        tele = {
-            # AC
-            "IR": ac.get("IR", 0.0),
-            "temperature": ac.get("Temp_C", 0.0),
-            "p_total_w": ac.get("P_ac", 0.0),
-            "q_total_var": ac.get("Q_ac", 0.0),
-            "v_ab": ac.get("V_a", 0.0),
-            "v_bc": ac.get("V_b", 0.0),
-            "v_ca": ac.get("V_c", 0.0),
-            "i_a": ac.get("I_a", 0.0),
-            "i_b": ac.get("I_b", 0.0),
-            "i_c": ac.get("I_c", 0.0),
-            "pf": ac.get("PF", 0.0),
-            "F": ac.get("H", 0.0),
-            # Energy
-            "e_day_kwh": ac.get("E_daily", 0.0),
-            "e_total_kwh": ac.get("E_total", 0.0),
-            # Error
-            "fault_code": err.get("fault_code", 0),
-            "fault_description": err.get("fault_description", ""),
-            "severity": err.get("severity", "STABLE"),
+        return {
+            "ts": datetime.strptime(row["ts"], DB_TIME_FMT),
+            "e_total": float(row["e_total"])
         }
 
-        # MPPT list chuẩn hoá
-        mppt_list = []
-        for mp in mppts:
-            mppt_list.append({
-                "v": mp.get("V_mppt", 0.0),
-                "i": mp.get("I_mppt", 0.0),
-                "p": mp.get("P_mppt", 0.0),
-            })
-
-        return cls(
-            inverter_id=inverter_id,
-            serial=serial,
-            tele=tele,
-            mppt=mppt_list,
-            strings=strings,
-            severity=tele.get("severity", "STABLE"),
-            fault_code=tele.get("fault_code", 0),
-            fault_description=tele.get("fault_description", ""),
-        )
-
-    # -----------------------------
-    @classmethod
-    def offline(
-        cls,
-        inverter_id: int,
-        serial: str,
-    ) -> "InverterData":
+    def sum_energy(
+        self,
+        inverter_id: Optional[str],
+        from_ts: datetime,
+        to_ts: datetime
+    ) -> float:
+        query = """
+            SELECT COALESCE(SUM(e_delta), 0)
+            FROM energy_log
+            WHERE ts >= ? AND ts < ?
         """
-        Inverter mất kết nối
-        """
+        params: List[Any] = [from_ts.strftime(DB_TIME_FMT), to_ts.strftime(DB_TIME_FMT)]
 
-        return cls(
-            inverter_id=inverter_id,
-            serial=serial,
-            tele={
-                "IR": 0.0,
-                "temperature": 0.0,
-                "p_total_w": 0.0,
-                "q_total_var": 0.0,
-                "v_ab": 0.0,
-                "v_bc": 0.0,
-                "v_ca": 0.0,
-                "i_a": 0.0,
-                "i_b": 0.0,
-                "i_c": 0.0,
-                "pf": 0.0,
-                "F": 0.0,
-                "e_day_kwh": 0.0,
-                "e_total_kwh": 0.0,
-                "fault_code": 0,
-                "fault_description": "OFFLINE",
-                "severity": "OFFLINE",
-            },
-            mppt=[],
-            strings=[],
-            severity="OFFLINE",
-            fault_code=0,
-            fault_description="OFFLINE",
-        )
+        if inverter_id:
+            query += " AND inverter_id = ?"
+            params.append(inverter_id)
+
+        with sqlite3.connect(self.db_path) as conn:
+            val = conn.execute(query, params).fetchone()[0]
+
+        return round(float(val or 0.0), 6)
+
+    def get_month_energy(self, inverter_id: Optional[str], year: int, month: int) -> float:
+        start = datetime(year, month, 1)
+        if month == 12:
+            end = datetime(year + 1, 1, 1)
+        else:
+            end = datetime(year, month + 1, 1)
+        return self.sum_energy(inverter_id, start, end)
+
+    # --------------------------
+    # DAILY MAX APIs
+    # --------------------------
+    def upsert_daily_max(
+        self,
+        inverter_id: str,
+        day: str,
+        mppt_index: int,
+        string_index: int,
+        max_v_mppt: float,
+        max_i_mppt: float,
+        max_p_mppt: float,
+        max_i_string: float,
+        ts: datetime
+    ):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT INTO daily_max
+                (inverter_id, day, mppt_index, string_index,
+                 max_v_mppt, max_i_mppt, max_p_mppt, max_i_string, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(inverter_id, day, mppt_index, string_index)
+                DO UPDATE SET
+                    max_v_mppt   = MAX(daily_max.max_v_mppt, excluded.max_v_mppt),
+                    max_i_mppt   = MAX(daily_max.max_i_mppt, excluded.max_i_mppt),
+                    max_p_mppt   = MAX(daily_max.max_p_mppt, excluded.max_p_mppt),
+                    max_i_string = MAX(daily_max.max_i_string, excluded.max_i_string),
+                    updated_at   = excluded.updated_at
+            """, (
+                inverter_id, day, int(mppt_index), int(string_index),
+                float(max_v_mppt), float(max_i_mppt), float(max_p_mppt), float(max_i_string),
+                ts.strftime(DB_TIME_FMT)
+            ))
+            conn.commit()
+
+    def get_daily_max(self, inverter_id: str, day: str) -> List[Dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT inverter_id, day, mppt_index, string_index,
+                       max_v_mppt, max_i_mppt, max_p_mppt, max_i_string
+                FROM daily_max
+                WHERE inverter_id = ? AND day = ?
+                ORDER BY mppt_index ASC, string_index ASC
+            """, (inverter_id, day)).fetchall()
+
+        return [dict(r) for r in rows]
+
 
 class InverterTracker:
     """

@@ -540,7 +540,7 @@ class SungrowSG110CXInverter:
             "PF": R(pf, ndigits=3),
             "H": R(F, ndigits=2),
             "E_daily": R(e_day_kwh, ndigits=3),
-            "E_monthly": R(e_day_kwh, ndigits=3),   # placeholder (see note)
+            "E_monthly": None, 
             "E_total": R(e_total_kwh, ndigits=3)
         }
 
@@ -563,9 +563,9 @@ class SungrowSG110CXInverter:
                 "V_mppt": R(v, ndigits=1),
                 "I_mppt": R(i, ndigits=2),
                 "P_mppt": R(p_calc, ndigits=1),
-                "Max_I": 15,
-                "Max_V": 1100,
-                "Max_P": 6000,
+                "Max_I": None,
+                "Max_V": None,
+                "Max_P": None,
                 "strings": []
             })
 
@@ -592,7 +592,7 @@ class SungrowSG110CXInverter:
                 mppt_strings.append({
                     "string_index": start + j + 1,
                     "I_mppt": R(sval, ndigits=2),
-                    "Max_I": 15
+                    "Max_I": None
                 })
             mppts[i]["strings"] = mppt_strings
 
